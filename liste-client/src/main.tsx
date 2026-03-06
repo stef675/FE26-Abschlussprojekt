@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import './index.css';
 
-// استيراد الصفحات بشكل صحيح
+// correctly pages import
 import Startseite from "./pages/Startseite";
 import NeueListe from "./pages/NeueListe";
 import ListenAnsicht from "./pages/ListenAnsicht";
@@ -12,7 +12,7 @@ import PersoenlicheAnsicht from "./pages/PersonlicheAnsicht";
 
 const queryClient = new QueryClient();
 
-// إعداد الراوتر ليتناسب مع روابط مشروعك
+// Router sitting to compare with my projekt
 const router = createBrowserRouter([
   {
     path: "/",
