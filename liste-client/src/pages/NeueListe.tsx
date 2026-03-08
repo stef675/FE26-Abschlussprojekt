@@ -2,16 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { listeClient } from "../listeClient";
-
-type CreateListResponse = {
-  id: number;
-  key: string;
-  title: string;
-  description: string;
-  eventDate: string | null;
-  attendees: number | null;
-  createdAt: number;
-};
+import type { ListeData } from "../types";
 
 export default function NeueListe() {
   const navigate = useNavigate();
@@ -23,7 +14,7 @@ export default function NeueListe() {
 
   const createListMutation = useMutation({
     mutationFn: () =>
-      listeClient<CreateListResponse>("/public/api/lists", {
+      listeClient<ListeData>("/public/api/lists", {
         method: "POST",
         body: JSON.stringify({
           title,
@@ -100,7 +91,11 @@ export default function NeueListe() {
             <button
               type="submit"
               className="button-primary"
-              disabled={createListMutation.isPending || !title.trim() || !description.trim()}
+              disabled={
+                createListMutation.isPending ||
+                !title.trim() ||
+                !description.trim()
+              }
             >
               {createListMutation.isPending ? "Erstellt..." : "Liste erstellen →"}
             </button>

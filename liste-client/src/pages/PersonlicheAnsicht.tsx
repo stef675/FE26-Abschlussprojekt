@@ -1,18 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listeClient } from "../listeClient";
-
-interface Submission {
-  id: number;
-  key: string;
-  listId: number;
-  name: string;
-  item: string;
-  guests?: string | null;
-  createdAt?: number;
-  updatedAt?: number;
-}
+import type { ListeData, Submission } from "../types";
 
 export default function PersonlicheAnsicht() {
   const { key, submissionKey } = useParams<{ key: string; submissionKey: string }>();
@@ -23,6 +13,14 @@ export default function PersonlicheAnsicht() {
   const [item, setItem] = useState("");
   const [guests, setGuests] = useState("");
   const [saved, setSaved] = useState(false);
+  const [copiedList, setCopiedList] = useState(false);
+  const [copiedPersonal, setCopiedPersonal] = useState(false);
+
+  const listQuery = useQuery<ListeData>({
+    queryKey: ["liste", key],
+    queryFn: () => listeClient(`/public/api/lists/${key}`),
+    enabled: !!key,
+  });
 
   const submissionsQuery = useQuery<Submission[]>({
     queryKey: ["submissions", key],
@@ -55,7 +53,7 @@ export default function PersonlicheAnsicht() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["submissions", key] });
       setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      setTimeout(() => setSaved(false), 1800);
     },
   });
 
@@ -73,6 +71,35 @@ export default function PersonlicheAnsicht() {
     },
   });
 
+  const listLink = `${window.location.origin}/liste/${key}`;
+  const personalLink = `${window.location.origin}/liste/${key}/${submissionKey}`;
+
+  const copyPersonalLink = async () => {
+    try {
+      await navigator.clipboard.writeText(personalLink);
+      setCopiedPersonal(true);
+      setTimeout(() => setCopiedPersonal(false), 1800);
+    } catch {
+      alert("Kopieren nicht möglich");
+    }
+  };
+
+  const copyListLink = async () => {
+    try {
+      await navigator.clipboard.writeText(listLink);
+      setCopiedList(true);
+      setTimeout(() => setCopiedList(false), 1800);
+    } catch {
+      alert("Kopieren nicht möglich");
+    }
+  };
+
+  const sortedEntries = useMemo(() => {
+    return [...(submissionsQuery.data ?? [])].sort((a, b) => {
+      return (a.createdAt ?? 0) - (b.createdAt ?? 0);
+    });
+  }, [submissionsQuery.data]);
+
   if (!key || !submissionKey) {
     return (
       <div className="page">
@@ -83,7 +110,7 @@ export default function PersonlicheAnsicht() {
     );
   }
 
-  if (submissionsQuery.isLoading) {
+  if (listQuery.isLoading || submissionsQuery.isLoading) {
     return (
       <div className="page">
         <div className="container">
@@ -93,12 +120,12 @@ export default function PersonlicheAnsicht() {
     );
   }
 
-  if (submissionsQuery.isError) {
+  if (listQuery.isError || submissionsQuery.isError || !listQuery.data) {
     return (
       <div className="page">
         <div className="container">
           <div className="error-box">
-            Fehler: {(submissionsQuery.error as Error).message}
+            Fehler beim Laden der Daten.
           </div>
         </div>
       </div>
@@ -115,14 +142,50 @@ export default function PersonlicheAnsicht() {
     );
   }
 
+  const liste = listQuery.data;
+
   return (
     <div className="page">
       <div className="container">
         <div className="card">
-          <h1 className="section-title">Dein Eintrag</h1>
+          <h1 className="title">{liste.title}</h1>
+          <p className="subtitle">{liste.description}</p>
+        </div>
+
+        <div className="card prominent-card">
+          <h2 className="section-title">Dein persönlicher Link</h2>
           <p className="section-subtitle">
-            Hier kannst du deine Angaben ändern oder löschen.
+            Speichere diesen Link, um deinen Eintrag später zu bearbeiten.
           </p>
+
+          <div className="copy-row">
+            <input className="input" value={personalLink} readOnly />
+            <button type="button" className="button-secondary" onClick={copyPersonalLink}>
+              Kopieren
+            </button>
+          </div>
+
+          {copiedPersonal && <div className="success-box">Persönlicher Link kopiert ✅</div>}
+        </div>
+
+        <div className="card">
+          <h2 className="section-title">Link zur Liste</h2>
+          <p className="section-subtitle">
+            Schicke diesen Link an alle Gäste – sie können sich direkt eintragen.
+          </p>
+
+          <div className="copy-row">
+            <input className="input" value={listLink} readOnly />
+            <button type="button" className="button-secondary" onClick={copyListLink}>
+              Kopieren
+            </button>
+          </div>
+
+          {copiedList && <div className="success-box">Listen-Link kopiert ✅</div>}
+        </div>
+
+        <div className="card">
+          <h2 className="section-title">Dein Eintrag</h2>
 
           <div className="grid-2">
             <div className="form-group">
@@ -159,7 +222,7 @@ export default function PersonlicheAnsicht() {
               onClick={() => updateMutation.mutate()}
               disabled={updateMutation.isPending || !name.trim() || !item.trim()}
             >
-              {updateMutation.isPending ? "Speichert..." : "Speichern"}
+              {updateMutation.isPending ? "Speichert..." : "Speichern →"}
             </button>
 
             <button
@@ -172,9 +235,7 @@ export default function PersonlicheAnsicht() {
             <button
               className="button-danger"
               onClick={() => {
-                if (window.confirm("Wirklich löschen?")) {
-                  deleteMutation.mutate();
-                }
+                if (window.confirm("Wirklich löschen?")) deleteMutation.mutate();
               }}
               disabled={deleteMutation.isPending}
             >
@@ -189,6 +250,29 @@ export default function PersonlicheAnsicht() {
               Fehler: {(updateMutation.error as Error).message}
             </div>
           )}
+        </div>
+
+        <div className="card">
+          <h2 className="section-title">Einträge</h2>
+
+          <div className="entry-list">
+            {sortedEntries.map((s) => (
+              <div
+                key={s.id}
+                className={`entry-card ${s.key === submissionKey ? "entry-card-own" : ""}`}
+              >
+                <div className="entry-left">
+                  <div className="entry-name">
+                    {s.name}
+                    {s.key === submissionKey && <span className="me-badge">Du</span>}
+                  </div>
+                  <div className="entry-item">{s.item}</div>
+                </div>
+
+                {s.guests && <div className="badge">{s.guests}</div>}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
