@@ -8,11 +8,13 @@ interface ListeData {
   key: string;
   title: string;
   description: string;
+  eventDate?: string | null;
+  attendees?: number | null;
 }
 
 interface Submission {
   id: number;
-  key: string; // edit key
+  key: string;
   listId: number;
   name: string;
   item: string;
@@ -28,40 +30,39 @@ export default function ListenAnsicht() {
 
   const [name, setName] = useState("");
   const [item, setItem] = useState("");
+  const [guests, setGuests] = useState("");
 
-  // 1) Load list
   const listQuery = useQuery<ListeData>({
     queryKey: ["liste", key],
     queryFn: () => listeClient(`/public/api/lists/${key}`),
     enabled: !!key,
   });
 
-  // 2) Load submissions for this list
   const submissionsQuery = useQuery<Submission[]>({
     queryKey: ["submissions", key],
     queryFn: () => listeClient(`/public/api/submissions?listKey=${key}`),
     enabled: !!key,
   });
 
-  // 3) Create submission
   const createMutation = useMutation({
-    mutationFn: async (neuerEintrag: { name: string; item: string }) => {
+    mutationFn: async () => {
       if (!listQuery.data) throw new Error("Liste not loaded yet");
 
       return listeClient<Submission>("/public/api/submissions", {
         method: "POST",
         body: JSON.stringify({
           listId: listQuery.data.id,
-          name: neuerEintrag.name,
-          item: neuerEintrag.item,
+          name,
+          item,
+          guests: guests.trim() ? guests : undefined,
         }),
       });
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["submissions", key] });
-      queryClient.invalidateQueries({ queryKey: ["liste", key] });
       setName("");
       setItem("");
+      setGuests("");
       navigate(`/liste/${key}/${data.key}`);
     },
   });
@@ -69,16 +70,20 @@ export default function ListenAnsicht() {
   const handleAddEntry = (e: React.FormEvent) => {
     e.preventDefault();
     if (!key) return;
-    createMutation.mutate({ name, item });
+    createMutation.mutate();
   };
 
-  if (!key) return <div style={{ padding: 20 }}>Fehlender Listen-Key.</div>;
+  if (!key) return <div className="page"><div className="container"><div className="error-box">Fehlender Listen-Key.</div></div></div>;
+  if (listQuery.isLoading) return <div className="page"><div className="container"><div className="card">Lädt die Liste...</div></div></div>;
 
-  if (listQuery.isLoading) return <div style={{ padding: 20 }}>Lädt die Liste...</div>;
   if (listQuery.isError || !listQuery.data) {
     return (
-      <div style={{ padding: 20, color: "red" }}>
-        Fehler beim Laden der Liste: {(listQuery.error as Error)?.message}
+      <div className="page">
+        <div className="container">
+          <div className="error-box">
+            Fehler beim Laden der Liste: {(listQuery.error as Error)?.message}
+          </div>
+        </div>
       </div>
     );
   }
@@ -86,72 +91,123 @@ export default function ListenAnsicht() {
   const liste = listQuery.data;
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>{liste.title}</h1>
-      <p>{liste.description}</p>
+    <div className="page">
+      <div className="container">
+        <div className="card">
+          <h1 className="title">{liste.title}</h1>
+          <p className="subtitle">{liste.description}</p>
 
-      <hr />
-
-      <h3>Wer bringt was mit?</h3>
-
-      {submissionsQuery.isLoading && <div>Lädt Einträge...</div>}
-
-      {submissionsQuery.isError && (
-        <div style={{ color: "red" }}>
-          Fehler beim Laden der Einträge: {(submissionsQuery.error as Error).message}
+          {(liste.eventDate || liste.attendees) && (
+            <div className="info-box">
+              {liste.eventDate && <div>📅 Datum: {liste.eventDate}</div>}
+              {liste.attendees !== undefined && liste.attendees !== null && (
+                <div>👥 Erwartete Gäste: {liste.attendees}</div>
+              )}
+            </div>
+          )}
         </div>
-      )}
 
-      {!submissionsQuery.isLoading && !submissionsQuery.isError && (
-        <ul>
-          {(submissionsQuery.data ?? []).map((s) => (
-            <li key={s.id}>
-              <strong>{s.name}</strong> bringt mit: {s.item}
-              {s.guests ? ` (Gäste: ${s.guests})` : ""}
-              {" — "}
-              <Link to={`/liste/${key}/${s.key}`}>bearbeiten</Link>
-            </li>
-          ))}
-        </ul>
-      )}
+        <div className="card">
+          <h2 className="section-title">Link zur Liste</h2>
+          <p className="section-subtitle">
+            Schicke diesen Link an alle Gäste – sie können sich direkt eintragen.
+          </p>
+          <input
+            className="input"
+            value={window.location.href}
+            readOnly
+            onFocus={(e) => e.target.select()}
+          />
+        </div>
 
-      <hr />
+        <div className="card">
+          <h2 className="section-title">Jetzt eintragen</h2>
 
-      <h3>Dich eintragen</h3>
-      <form
-        onSubmit={handleAddEntry}
-        style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 420 }}
-      >
-        <input
-          placeholder="Dein Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          style={{ padding: 8 }}
-        />
+          <form onSubmit={handleAddEntry}>
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="label">Dein Name</label>
+                <input
+                  className="input"
+                  placeholder="z. B. Anna"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
 
-        <input
-          placeholder="Was bringst du mit?"
-          value={item}
-          onChange={(e) => setItem(e.target.value)}
-          required
-          style={{ padding: 8 }}
-        />
+              <div className="form-group">
+                <label className="label">Was bringst du mit?</label>
+                <input
+                  className="input"
+                  placeholder="z. B. Kartoffelsalat"
+                  value={item}
+                  onChange={(e) => setItem(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
 
-        <button
-          type="submit"
-          disabled={createMutation.isPending}
-          style={{ padding: 10, cursor: "pointer" }}
-        >
-          {createMutation.isPending ? "Sendet..." : "Eintrag erstellen"}
-        </button>
+            <div className="form-group">
+              <label className="label">Gäste (optional)</label>
+              <input
+                className="input"
+                placeholder="z. B. 3 Personen"
+                value={guests}
+                onChange={(e) => setGuests(e.target.value)}
+              />
+            </div>
 
-        {createMutation.isError && (
-          <div style={{ color: "red" }}>
-            Fehler: {(createMutation.error as Error).message}
+            <button
+              type="submit"
+              className="button-primary"
+              disabled={createMutation.isPending || !name.trim() || !item.trim()}
+            >
+              {createMutation.isPending ? "Sendet..." : "Eintragen →"}
+            </button>
+
+            {createMutation.isError && (
+              <div className="error-box">
+                Fehler: {(createMutation.error as Error).message}
+              </div>
+            )}
+          </form>
+        </div>
+
+        <div className="card">
+          <h2 className="section-title">Einträge</h2>
+
+          {submissionsQuery.isLoading && <div className="empty-state">Lädt Einträge...</div>}
+
+          {submissionsQuery.isError && (
+            <div className="error-box">
+              Fehler beim Laden der Einträge: {(submissionsQuery.error as Error).message}
+            </div>
+          )}
+
+          {!submissionsQuery.isLoading &&
+            !submissionsQuery.isError &&
+            (submissionsQuery.data ?? []).length === 0 && (
+              <div className="empty-state">Noch keine Einträge — sei der Erste!</div>
+            )}
+
+          <div className="entry-list">
+            {(submissionsQuery.data ?? []).map((s) => (
+              <div key={s.id} className="entry-card">
+                <div className="entry-left">
+                  <div className="entry-name">{s.name}</div>
+                  <div className="entry-item">{s.item}</div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  {s.guests && <div className="badge">{s.guests}</div>}
+                  <Link to={`/liste/${key}/${s.key}`}>bearbeiten</Link>
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-      </form>
+        </div>
+      </div>
     </div>
   );
 }

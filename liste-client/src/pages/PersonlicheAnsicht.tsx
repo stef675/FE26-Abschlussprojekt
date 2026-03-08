@@ -5,7 +5,7 @@ import { listeClient } from "../listeClient";
 
 interface Submission {
   id: number;
-  key: string; // edit key
+  key: string;
   listId: number;
   name: string;
   item: string;
@@ -22,6 +22,7 @@ export default function PersonlicheAnsicht() {
   const [name, setName] = useState("");
   const [item, setItem] = useState("");
   const [guests, setGuests] = useState("");
+  const [saved, setSaved] = useState(false);
 
   const submissionsQuery = useQuery<Submission[]>({
     queryKey: ["submissions", key],
@@ -53,8 +54,8 @@ export default function PersonlicheAnsicht() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["submissions", key] });
-      queryClient.invalidateQueries({ queryKey: ["liste", key] });
-      alert("Erfolgreich aktualisiert ✅");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     },
   });
 
@@ -68,86 +69,127 @@ export default function PersonlicheAnsicht() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["submissions", key] });
-      queryClient.invalidateQueries({ queryKey: ["liste", key] });
       navigate(`/liste/${key}`);
     },
   });
 
-  if (!key || !submissionKey) return <div style={{ padding: 20 }}>Fehlende Parameter.</div>;
-  if (submissionsQuery.isLoading) return <div style={{ padding: 20 }}>Lädt...</div>;
+  if (!key || !submissionKey) {
+    return (
+      <div className="page">
+        <div className="container">
+          <div className="error-box">Fehlende Parameter.</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (submissionsQuery.isLoading) {
+    return (
+      <div className="page">
+        <div className="container">
+          <div className="card">Lädt...</div>
+        </div>
+      </div>
+    );
+  }
 
   if (submissionsQuery.isError) {
     return (
-      <div style={{ padding: 20, color: "red" }}>
-        Fehler: {(submissionsQuery.error as Error).message}
+      <div className="page">
+        <div className="container">
+          <div className="error-box">
+            Fehler: {(submissionsQuery.error as Error).message}
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!mySubmission) {
     return (
-      <div style={{ padding: 20 }}>
-        Eintrag nicht gefunden أو تم حذفه.
-        <div style={{ marginTop: 10 }}>
-          <button onClick={() => navigate(`/liste/${key}`)} style={{ padding: 10 }}>
-            Zurück
-          </button>
+      <div className="page">
+        <div className="container">
+          <div className="error-box">Eintrag nicht gefunden oder wurde gelöscht.</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Eintrag bearbeiten</h1>
-      <p>Hier kannst du deine Angaben ändern oder löschen.</p>
+    <div className="page">
+      <div className="container">
+        <div className="card">
+          <h1 className="section-title">Dein Eintrag</h1>
+          <p className="section-subtitle">
+            Hier kannst du deine Angaben ändern oder löschen.
+          </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 420 }}>
-        <input value={name} onChange={(e) => setName(e.target.value)} style={{ padding: 8 }} />
-        <input value={item} onChange={(e) => setItem(e.target.value)} style={{ padding: 8 }} />
-        <input
-          value={guests}
-          onChange={(e) => setGuests(e.target.value)}
-          placeholder="Gäste (optional)"
-          style={{ padding: 8 }}
-        />
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="label">Dein Name</label>
+              <input
+                className="input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
 
-        <button
-          onClick={() => updateMutation.mutate()}
-          disabled={updateMutation.isPending || !name.trim() || !item.trim()}
-          style={{ padding: 10, cursor: "pointer" }}
-        >
-          {updateMutation.isPending ? "Speichert..." : "Änderungen speichern"}
-        </button>
+            <div className="form-group">
+              <label className="label">Was bringst du mit?</label>
+              <input
+                className="input"
+                value={item}
+                onChange={(e) => setItem(e.target.value)}
+              />
+            </div>
+          </div>
 
-        <button
-          onClick={() => {
-            if (window.confirm("Wirklich löschen?")) deleteMutation.mutate();
-          }}
-          disabled={deleteMutation.isPending}
-          style={{
-            padding: 10,
-            cursor: "pointer",
-            border: "none",
-            color: "white",
-            backgroundColor: "#ff4d4d",
-          }}
-        >
-          {deleteMutation.isPending ? "Löscht..." : "Eintrag löschen"}
-        </button>
+          <div className="form-group">
+            <label className="label">Gäste (optional)</label>
+            <input
+              className="input"
+              value={guests}
+              onChange={(e) => setGuests(e.target.value)}
+            />
+          </div>
 
-        <button
-          onClick={() => navigate(`/liste/${key}`)}
-          style={{
-            background: "none",
-            border: "none",
-            color: "blue",
-            cursor: "pointer",
-            textDecoration: "underline",
-          }}
-        >
-          ← Zurück zur Liste
-        </button>
+          <div className="actions">
+            <button
+              className="button-primary"
+              onClick={() => updateMutation.mutate()}
+              disabled={updateMutation.isPending || !name.trim() || !item.trim()}
+            >
+              {updateMutation.isPending ? "Speichert..." : "Speichern"}
+            </button>
+
+            <button
+              className="button-secondary"
+              onClick={() => navigate(`/liste/${key}`)}
+            >
+              Abbrechen
+            </button>
+
+            <button
+              className="button-danger"
+              onClick={() => {
+                if (window.confirm("Wirklich löschen?")) {
+                  deleteMutation.mutate();
+                }
+              }}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Löscht..." : "Eintrag löschen"}
+            </button>
+          </div>
+
+          {saved && <div className="success-box">Änderungen wurden gespeichert ✅</div>}
+
+          {updateMutation.isError && (
+            <div className="error-box">
+              Fehler: {(updateMutation.error as Error).message}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,20 +1,23 @@
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 export default function Startseite() {
-  const navigate = useNavigate();
-
   return (
-    <div style={{ textAlign: "center", marginTop: "50px" }}>
-      <h1>liste.live</h1>
-      <p>Erstelle ganz einfach Mitbringlisten für deine Partys!</p>
-      
-      {/* Button zum Navigieren */}
-      <button 
-        onClick={() => navigate("/neue-liste")}
-        style={{ padding: "10px 20px", fontSize: "16px", cursor: "pointer" }}
-      >
-        Neue Liste erstellen
-      </button>
+    <div className="page">
+      <div className="container hero">
+        <h1 className="logo-title">
+          liste<span className="logo-blue">.live</span>
+        </h1>
+
+        <p className="subtitle">
+          Erstelle eine Mitbringliste und teile sie mit deinen Gästen.
+        </p>
+
+        <Link to="/neue-liste">
+          <button className="button-primary" style={{ maxWidth: 260 }}>
+            Neue Liste erstellen →
+          </button>
+        </Link>
+      </div>
     </div>
   );
 }
